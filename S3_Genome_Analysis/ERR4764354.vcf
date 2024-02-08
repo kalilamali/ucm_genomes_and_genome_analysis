@@ -1,0 +1,44 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##bcftoolsVersion=1.9+htslib-1.9
+##bcftoolsCommand=mpileup -Ou -f MN996528.1.fasta ERR4764354.dedup.sorted.bam
+##reference=file://MN996528.1.fasta
+##contig=<ID=ENA|MN996528|MN996528.1,length=29891>
+##ALT=<ID=*,Description="Represents allele(s) other than observed.">
+##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
+##INFO=<ID=IDV,Number=1,Type=Integer,Description="Maximum number of reads supporting an indel">
+##INFO=<ID=IMF,Number=1,Type=Float,Description="Maximum fraction of reads supporting an indel">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Raw read depth">
+##INFO=<ID=VDB,Number=1,Type=Float,Description="Variant Distance Bias for filtering splice-site artefacts in RNA-seq data (bigger is better)",Version="3">
+##INFO=<ID=RPB,Number=1,Type=Float,Description="Mann-Whitney U test of Read Position Bias (bigger is better)">
+##INFO=<ID=MQB,Number=1,Type=Float,Description="Mann-Whitney U test of Mapping Quality Bias (bigger is better)">
+##INFO=<ID=BQB,Number=1,Type=Float,Description="Mann-Whitney U test of Base Quality Bias (bigger is better)">
+##INFO=<ID=MQSB,Number=1,Type=Float,Description="Mann-Whitney U test of Mapping Quality vs Strand Bias (bigger is better)">
+##INFO=<ID=SGB,Number=1,Type=Float,Description="Segregation based metric.">
+##INFO=<ID=MQ0F,Number=1,Type=Float,Description="Fraction of MQ0 reads (smaller is better)">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="List of Phred-scaled genotype likelihoods">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##INFO=<ID=ICB,Number=1,Type=Float,Description="Inbreeding Coefficient Binomial test (bigger is better)">
+##INFO=<ID=HOB,Number=1,Type=Float,Description="Bias in the number of HOMs number (smaller is better)">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes for each ALT allele, in the same order as listed">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=DP4,Number=4,Type=Integer,Description="Number of high-quality ref-forward , ref-reverse, alt-forward and alt-reverse bases">
+##INFO=<ID=MQ,Number=1,Type=Integer,Description="Average mapping quality">
+##bcftools_callVersion=1.9+htslib-1.9
+##bcftools_callCommand=call --ploidy 1 -Oz -m -v -o ERR4764354.vcf.gz; Date=Fri Nov  5 12:46:23 2021
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	ERR4764354.dedup.sorted.bam
+ENA|MN996528|MN996528.1	241	.	C	T	225	.	DP=13;VDB=0.935167;SGB=-0.651104;MQSB=1;MQ0F=0;AC=1;AN=1;DP4=0,0,6,2;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	1344	.	T	C	174	.	DP=10;VDB=0.00155991;SGB=-0.670168;MQSB=1;MQ0F=0;AC=1;AN=1;DP4=0,0,9,1;MQ=60	GT:PL	1:204,0
+ENA|MN996528|MN996528.1	3037	.	C	T	154	.	DP=8;VDB=0.0058656;SGB=-0.556411;MQ0F=0;AC=1;AN=1;DP4=0,0,4,0;MQ=60	GT:PL	1:184,0
+ENA|MN996528|MN996528.1	4291	.	A	T	86	.	DP=5;VDB=0.00187095;SGB=-0.590765;MQ0F=0;AC=1;AN=1;DP4=0,0,0,5;MQ=60	GT:PL	1:116,0
+ENA|MN996528|MN996528.1	8683	.	C	T	225	.	DP=21;VDB=1.10786e-07;SGB=-0.692067;MQSB=1;MQ0F=0;AC=1;AN=1;DP4=0,0,17,3;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	14408	.	C	T	225	.	DP=18;VDB=0.808624;SGB=-0.676189;MQSB=1;MQ0F=0;AC=1;AN=1;DP4=0,0,9,2;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	15406	.	G	T	148	.	DP=11;VDB=2.89569e-08;SGB=-0.676189;MQ0F=0;AC=1;AN=1;DP4=0,0,0,11;MQ=60	GT:PL	1:178,0
+ENA|MN996528|MN996528.1	16260	.	C	T	203	.	DP=11;VDB=3.30444e-05;SGB=-0.676189;MQSB=1;MQ0F=0;AC=1;AN=1;DP4=0,0,9,2;MQ=60	GT:PL	1:233,0
+ENA|MN996528|MN996528.1	19960	.	A	G	83	.	DP=4;VDB=0.00671048;SGB=-0.556411;MQ0F=0;AC=1;AN=1;DP4=0,0,4,0;MQ=60	GT:PL	1:113,0
+ENA|MN996528|MN996528.1	21637	.	C	T	99	.	DP=6;VDB=0.00215942;SGB=-0.590765;MQ0F=0;AC=1;AN=1;DP4=0,0,0,5;MQ=60	GT:PL	1:129,0
+ENA|MN996528|MN996528.1	23403	.	A	G	225	.	DP=10;VDB=0.00011539;SGB=-0.670168;MQSB=1.00775;MQ0F=0;AC=1;AN=1;DP4=0,0,6,4;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	28300	.	G	T	160	.	DP=12;VDB=0.00223758;SGB=-0.590765;MQ0F=0;AC=1;AN=1;DP4=0,0,5,0;MQ=60	GT:PL	1:190,0
+ENA|MN996528|MN996528.1	28881	.	G	A	225	.	DP=28;VDB=1.29641e-11;SGB=-0.691153;MQ0F=0;AC=1;AN=1;DP4=0,0,18,0;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	28882	.	G	A	225	.	DP=28;VDB=1.67004e-15;SGB=-0.692352;MQ0F=0;AC=1;AN=1;DP4=0,0,21,0;MQ=60	GT:PL	1:255,0
+ENA|MN996528|MN996528.1	28883	.	G	C	225	.	DP=28;VDB=1.97624e-15;SGB=-0.692831;MQ0F=0;AC=1;AN=1;DP4=0,0,24,0;MQ=60	GT:PL	1:255,0

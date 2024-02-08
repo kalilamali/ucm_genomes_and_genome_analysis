@@ -1,0 +1,432 @@
+---
+title: "Material semana 1 Noviembre 2021"
+output: github_document
+---
+
+*Tutorial:*
+https://www.bioconductor.org/packages/devel/bioc/vignettes/GenomicRanges/inst/doc/GenomicRangesIntroduction.html
+```{r}
+# Install package
+#BiocManager::install("GenomicRanges")
+
+# Load package
+library(GenomicRanges)
+```
+
+*Practica:*
+```{r}
+# Load genecode for human GRCh38 Genome Assembly
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1", 
+                      header=TRUE, 
+                      stringsAsFactors = FALSE)
+
+# View rows 1 to 5, all columns
+gencode[1:5,]
+```
+
+There are 2 options to download the file:
+
+*OPTION#1*
+Donwload variant_summary.txt tabulated file from ClinVar (NCBI)
+wget https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz 
+Decompress the .GZ file
+gunzip variant_summary.txt.gz 
+```{r}
+# Read the .txt file
+full.clinvar <- read.delim(file = "variant_summary.txt", stringsAsFactors = FALSE)
+```
+
+*OPTION#2*
+
+*ALWAYS USE OPTION#2 DROPBOX METHOD WHEN POSSIBLE*
+*IT WAS NOT USED BECAUSE THE LINK BREAKS*
+```{r}
+# Load a data frame for genetic variants associated with diseases separated by tabulator ("\t")
+# ClinVar
+
+# Read .txt file from link
+#full.clinvar <- read.delim(file = "https://www.dropbox.com/s/tdii0h3m0si393e/variant_summary.txt?dl=1", stringsAsFactors = F)
+```
+
+# CONTINUE AFTER LOADING DATA
+```{r}
+# This chunck does the data cleaning and organizing
+
+# Subset data to only have GRCh38 in the column Assembly
+clinvar <- subset(full.clinvar, Assembly=="GRCh38")
+
+# Remove old df
+rm(full.clinvar)
+
+# View rows 1 to 5, all columns
+clinvar[1:5,]
+
+# Add the prefix chr to the column Chromosome
+clinvar$Chromosome <- paste("chr", clinvar$Chromosome, sep="")
+
+# Select all pathogenic like data
+clinvar.pathogenic <- clinvar[grep(pattern = "pathogenic", ignore.case = T, x = clinvar$ClinicalSignificance),]
+clinvar.pathogenic <- clinvar.pathogenic[,c("RS...dbSNP.","Chromosome","Start","Stop","Cytogenetic","Type")]
+clinvar.pathogenic <- subset(clinvar.pathogenic, RS...dbSNP.!="-1")
+
+# Remove old df
+rm(clinvar)
+
+# View which pathogenic types are and how many of each
+table(clinvar.pathogenic$Type)
+
+# We select only Pathogenic genomic variation
+clinvar.pathogenic <- subset(clinvar.pathogenic, Type=="single nucleotide variant")
+
+# We remove redundants rows.
+clinvar.pathogenic <- unique(clinvar.pathogenic)
+genetic.variants <- clinvar.pathogenic
+colnames(genetic.variants) <- c("VarID","chromosome","start", "end", "cytogenetic", "Type")
+
+# We remove processed data.frames
+rm(clinvar.pathogenic)
+```
+
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr <- GRanges(seqnames = gencode$chromosome,
+              ranges = IRanges(start = gencode$start, end = gencode$end),
+              strand = gencode$strand,
+              geneID = gencode$gene_name)
+# View first 2 rows
+head(gr, 2)
+```
+
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr.tss <- promoters(x = gr, upstream = 2500, downstream = 500)
+# View first 2 rows
+head(gr.tss, 2)
+```
+
+```{r}
+# Load genetic variants coordinates as genomic range object
+gvar <- GRanges(seqnames = genetic.variants$chromosome,
+                ranges = IRanges(start = genetic.variants$start, end = genetic.variants$end),
+                strand = rep(x = "*", times=length(genetic.variants$VarID)),
+                VarID = genetic.variants$VarID)
+# View first 2 rows
+head(gvar, 2)
+```
+
+```{r}
+# Find the overlaps between genes and genetic variants.
+gene.var.overlap <- findOverlaps(query = gr.tss, subject = gvar)
+
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(gene.var.overlap)
+subjectHits(gene.var.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(gene.var.overlap)])
+gvars.overlaps <- as.data.frame(gvar[subjectHits(gene.var.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(gvars.overlaps) <- paste0("S_",colnames(gvars.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.var.overlap.full <- cbind(genes.overlaps, gvars.overlaps) 
+
+# View first 2 rows
+head(gene.var.overlap.full, 2)
+```
+
+```{r}
+#We can now make a table for Chromosome 2 of the genes with higher number of hits for Known pathogenic mutations:
+sort(table(subset(gene.var.overlap.full, Q_seqnames=="chr2")$Q_geneID), decreasing = T)
+```
+
+#HOMEWORK
+*Exercise 5.1:* Using Gencode annotation and Genomic variants from ClinVar search the gene with more single nucleotide variants (SNVs) in its whole locus in your assigned chromosome. What is the resulting gene? To do this procedure replicate a similar procedure as the used in classes but do not subset for a specific clinical significance of the genetic variants from ClinVar data.frame to compute the required overlaps. Provide the ENSEMBL gene ID (i.e. ENSGXXXXXXXXX.14). Use GRCh38 for gencode and the genetic variant file from ClinVar that is accessible by this Dropbox link.
+https://www.dropbox.com/s/tdii0h3m0si393e/variant_summary.txt?dl=1
+
+Load package
+```{r}
+# Load package
+library(GenomicRanges)
+```
+
+Load Gencode annotation data
+```{r}
+# Load genecode for human GRCh38 Genome Assembly
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1", 
+                      header=TRUE, 
+                      stringsAsFactors = FALSE)
+
+# Select only chromosome 21 as 21 is my assigned chromosome
+gencode.21 <- subset(gencode, chromosome=="chr21")
+# Remove old df
+rm(gencode)
+
+```
+
+Load Genomic variants from ClinVar
+```{r}
+# Read the .txt file
+full.clinvar <- read.delim(file = "variant_summary_5.1.txt", stringsAsFactors = FALSE)
+
+# Select only GRCh38 as gencode uses only this
+clinvar <- subset(full.clinvar, Assembly=="GRCh38")
+
+# Remove old df
+rm(full.clinvar)
+
+# Add the prefix chr to the column Chromosome
+clinvar$Chromosome <- paste("chr", clinvar$Chromosome, sep="")
+
+# Select only chromosome 21 as 21 is my assigned chromosome
+clinvar.21 <- subset(clinvar, Chromosome=="chr21")
+
+# Remove old df
+rm(clinvar)
+
+# Select only single nucleotide variants
+clinvar.21.snv <- subset(clinvar.21, Type=="single nucleotide variant")
+
+# Remove old df
+rm(clinvar.21)
+```
+
+Transform the information in columns of the data frame as a GenomicRange object.
+```{r}
+#Gencode
+gr <- GRanges(seqnames = gencode.21$chromosome,
+              ranges = IRanges(start = gencode.21$start, end = gencode.21$end),
+              strand = gencode.21$strand,
+              geneID = gencode.21$gene_id)
+
+# Genomic variants from ClinVar
+gvar <- GRanges(seqnames = clinvar.21.snv$Chromosome,
+                ranges = IRanges(start = clinvar.21.snv$Start, end = clinvar.21.snv$Stop),
+                strand = rep(x = "*", times=length(clinvar.21.snv$VariationID)),
+                VariationID = clinvar.21.snv$VariationID)
+```
+
+Define TSS of genes.
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr.tss <- promoters(x = gr, upstream = 2500, downstream = 500)
+```
+
+Find the overlaps between genes and genetic variants.
+```{r}
+gene.var.overlap <- findOverlaps(query = gr.tss, subject = gvar)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(gene.var.overlap)
+subjectHits(gene.var.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(gene.var.overlap)])
+gvars.overlaps <- as.data.frame(gvar[subjectHits(gene.var.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(gvars.overlaps) <- paste0("S_",colnames(gvars.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.var.overlap.full <- cbind(genes.overlaps, gvars.overlaps) 
+```
+
+Result
+```{r}
+#We can now make a table for Chromosome 21 of the genes with higher number of hits for single nucleotide variants
+sort(table(subset(gene.var.overlap.full, Q_seqnames=="chr21")$Q_geneID), decreasing = T)
+```
+ANSWER: ENSG00000273271.1
+
+*Exercise 5.2:* S2E05.2 What is the gene name of the gene ID?
+```{r}
+gencode.21[gencode.21$gene_id %in% "ENSG00000273271.1","gene_name"]
+```
+ANSWER:AP000254.1
+
+*Exercise 5.3:* How many genetic variants are located within at its promoters of this particular gene?
+```{r}
+length(table(gene.var.overlap.full$S_VariationID))
+```
+ASNWER: 566
+
+*Exercise 6.1:* Analyse the ClinVar data.frame and determine which is the longest pathogenic (exclusively pathogenic) deletion within your assigned chromosome for GRCh37. Provide the genomic coordinates of the deletion.
+
+```{r}
+#Load genecode for human GRCh37 Genome Assembly
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh37.txt?dl=1", 
+                      header=TRUE, 
+                      stringsAsFactors = FALSE)
+
+#Load Genomic variants from ClinVar
+full.clinvar <- read.delim(file = "variant_summary_5.1.txt", stringsAsFactors = FALSE)
+
+# Select only GRCh37 as gencode uses only this
+clinvar <- subset(full.clinvar, Assembly=="GRCh37")
+
+rm(full.clinvar)
+
+# Add the prefix chr to the column Chromosome
+clinvar$Chromosome <- paste("chr", clinvar$Chromosome, sep="")
+
+# Select only chromosome 21 as 21 is my assigned chromosome
+clinvar.21 <- subset(clinvar, Chromosome=="chr21")
+
+# Remove old df
+rm(clinvar)
+
+# Subset data to have exclusively pathogenic
+clinvar.21.pathogenic <- subset(clinvar.21, ClinicalSignificance=="Pathogenic")
+clinvar.21.pathogenic <- clinvar.21.pathogenic[,c("RS...dbSNP.","Chromosome","Start","Stop","Cytogenetic","Type")]
+clinvar.21.pathogenic <- subset(clinvar.21.pathogenic, RS...dbSNP.!="-1")
+
+# Remove old df
+rm(clinvar.21)
+
+# Subset data to have deletions only
+clinvar.21.pathogenic.del <- subset(clinvar.21.pathogenic, Type=="Deletion")
+
+# Remove old df
+rm(clinvar.21.pathogenic)
+
+# We remove redundants rows.
+clinvar.21.pathogenic.del <- unique(clinvar.21.pathogenic.del)
+genetic.variants <- clinvar.21.pathogenic.del
+colnames(genetic.variants) <- c("VarID","chromosome","start", "end", "cytogenetic", "Type")
+
+```
+
+Transform the information in columns of the data frame as a GenomicRange object.
+
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr <- GRanges(seqnames = gencode$chromosome,
+              ranges = IRanges(start = gencode$start, end = gencode$end),
+              strand = gencode$strand,
+              geneID = gencode$gene_name)
+
+# Load genetic variants coordinates as genomic range object
+gvar <- GRanges(seqnames = genetic.variants$chromosome,
+                ranges = IRanges(start = genetic.variants$start, end = genetic.variants$end),
+                strand = rep(x = "*", times=length(genetic.variants$VarID)),
+                VarID = genetic.variants$VarID)
+```
+
+Define TSS of genes
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr.tss <- promoters(x = gr, upstream = 2500, downstream = 500)
+```
+
+Find the overlaps between genes and genetic variants.
+```{r}
+gene.var.overlap <- findOverlaps(query = gr.tss, subject = gvar)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(gene.var.overlap)
+subjectHits(gene.var.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(gene.var.overlap)])
+gvars.overlaps <- as.data.frame(gvar[subjectHits(gene.var.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(gvars.overlaps) <- paste0("S_",colnames(gvars.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.var.overlap.full <- cbind(genes.overlaps, gvars.overlaps) 
+```
+
+Result
+```{r}
+#We can now make a table for Chromosome 21 of the genes with higher number of hits for single nucleotide variants
+longest_del <- max(gene.var.overlap.full$S_width)
+gene.var.overlap.full[gene.var.overlap.full$S_width %in% longest_del,c("S_start","S_end")]
+```
+ASNWER: 38007970-39747620
+
+*Exercise 7.1:* SUsing Gencode annotation and Genomic variants from ClinVar search the “protein-coding” gene of your assigned chromosome with more benign single nucleotide variants (SNVs) within its whole locus. Provide the ENSEMBL gene ID (i.e. ENSGXXXXXXXXX.14). Use GRCh38 for gencode and the genetic variant file from ClinVar that is accessible by this Dropbox link.
+
+```{r}
+#Load genecode for human GRCh38 Genome Assembly
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1", 
+                      header=TRUE, 
+                      stringsAsFactors = FALSE)
+
+# Select only protein coding genes
+gencode.p <- subset(gencode, type=="protein_coding")
+
+# Remove old df
+rm(gencode)
+
+#Load Genomic variants from ClinVar
+full.clinvar <- read.delim(file = "variant_summary_7.1.txt", stringsAsFactors = FALSE)
+
+# Select only GRCh38 as gencode uses only this
+clinvar <- subset(full.clinvar, Assembly=="GRCh38")
+
+# Add the prefix chr to the column Chromosome
+clinvar$Chromosome <- paste("chr", clinvar$Chromosome, sep="")
+
+# Select only chromosome 21 as 21 is my assigned chromosome
+clinvar.21 <- subset(clinvar, Chromosome=="chr21")
+
+# Remove old df
+rm(clinvar)
+
+# Subset data to have deletions only
+clinvar.21.snv <- subset(clinvar.21, Type=="single nucleotide variant")
+
+# Remove old df
+rm(clinvar.21)
+```
+
+Transform the information in columns of the data frame as a GenomicRange object.
+
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr <- GRanges(seqnames = gencode.p$chromosome,
+              ranges = IRanges(start = gencode.p$start, end = gencode.p$end),
+              strand = gencode.p$strand,
+              geneID = gencode.p$gene_id)
+
+# Load genetic variants coordinates as genomic range object
+gvar <- GRanges(seqnames = clinvar.21.snv$Chromosome,
+                ranges = IRanges(start = clinvar.21.snv$Start, end = clinvar.21.snv$Stop),
+                strand = rep(x = "*", times=length(clinvar.21.snv$VariationID)),
+                VariationID = clinvar.21.snv$VariationID)
+```
+
+Define TSS of genes
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr.tss <- promoters(x = gr, upstream = 2500, downstream = 500)
+```
+
+Find the overlaps between genes and genetic variants.
+```{r}
+gene.var.overlap <- findOverlaps(query = gr.tss, subject = gvar)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(gene.var.overlap)
+subjectHits(gene.var.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(gene.var.overlap)])
+gvars.overlaps <- as.data.frame(gvar[subjectHits(gene.var.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(gvars.overlaps) <- paste0("S_",colnames(gvars.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.var.overlap.full <- cbind(genes.overlaps, gvars.overlaps) 
+```
+
+Result
+```{r}
+#We can now make a table for Chromosome 2 of the genes with higher number of hits for Known pathogenic mutations:
+sort(table(subset(gene.var.overlap.full, Q_seqnames=="chr21")$Q_geneID), decreasing = T)
+```
+ANSWER: ENSG00000142168.14

@@ -1,0 +1,190 @@
+---
+title: "Material semana 27 Octubre 2021"
+output: github_document
+---
+
+*Tutorial:* <https://bioconductor.org/packages/release/bioc/vignettes/biomaRt/inst/doc/accessing_ensembl.html>
+
+```{r}
+# Instalar
+# BiocManager::install("biomaRt")
+# Cargar
+library("biomaRt")
+```
+
+*Exercise 1.1:* Build your own whole Human Gene Annotation file using Biomart ENSEMBL. Once you have built your gene annotation file load the gencode file GRCh37 of gene annotations at the dropbox link below, you should chose a few random genes that are at different genome locations and compare their positions at the genome in both Gene Annotations (e.g.Â ENSEMBL-Biomart and Gencode version). Are the genomic coordinates of genes the same as those that has been used in the previous sessions?. Hint: to build a data.frame with information similar to the Gencode Annotation File you must select in biomart those attributes to build you own an annotation file for all genes within human genome.
+
+```{r}
+# Dado un archivo de anotacion
+gencode <- read.table("https://www.dropbox.com/s/jpn22hwswgk69wr/gencode_GRCh37.txt?dl=1",
+                      header=TRUE,
+                      stringsAsFactors = FALSE)
+# Observar el contenido
+head(gencode)
+# Observar las columnas que tiene para hacer un archivo similar
+colnames(gencode)
+```
+
+```{r}
+# Seleccionar los datos que vamos a tener nuestro propia anotacion
+ensembl_genes <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+
+# Ver que columnas hay
+available.Attributes = listAttributes(ensembl_genes)
+head(available.Attributes)
+
+# Buscar cual es el nombre de las columnas parecidas a las de gencode:
+#"gene_id"    "gene_name"  "chromosome" "start"  "end"        "strand"     "type" 
+searchAttributes(mart = ensembl_genes, pattern = "gene_id")
+searchAttributes(mart = ensembl_genes, pattern = "gene_name")
+searchAttributes(mart = ensembl_genes, pattern = "chromosome")
+searchAttributes(mart = ensembl_genes, pattern = "start")
+searchAttributes(mart = ensembl_genes, pattern = "end")
+searchAttributes(mart = ensembl_genes, pattern = "strand")
+searchAttributes(mart = ensembl_genes, pattern = "type")
+
+# Hacer una lista de los columnas encontradas en nuestro archivo
+mycols = c("ensembl_gene_id", "external_gene_name", "chromosome_name", "start_position", "end_position",  "strand", "gene_biotype")
+
+# Crear nuestra anotacion
+getBM(attributes = mycols,
+      mart=ensembl_genes)
+```
+
+```{r}
+# Escoger unos genes random de gencode
+random_genes <- c("ENSG00000242485", "ENSG00000105518")
+
+# Hacer una anotacion de nuestro archivo solo con los genes random
+getBM(attributes = mycols,
+      filters = "ensembl_gene_id",
+      values = random_genes,
+      mart=ensembl_genes)
+```
+
+```{r}
+# Comparar nuestra anotacion con gencode
+gencode[gencode$gene_id %in% random_genes, ]
+```
+
+ANSWER: No.
+
+*Exercise 1.2:* Why? Reasoning your previous answer. ANSWER: The strand in gencode is - while in my annotation is -1. The starts and end positions also don't match.
+
+*Exercise 2.1:* Using the BioMart-Gencode version of the previous exercise, try to generate an annotation data frame adding information about the location of the exons within the two longer genes in the chromosome that has been assigned to you. Include for each exon their corresponding ENSEMBL IDs, start and end positions as well as the transcript ID that the exon belong. Provide the total number of exons, take care of not counting more than once each value.
+
+```{r}
+# Definir my chromosoma
+mychr <- 21
+# Hacer una tabla de mis datos
+df <- getBM(attributes = mycols,
+      filters = "chromosome_name",
+      values = mychr,
+      mart = ensembl_genes)
+
+# Crear una columna en mis datos llamada lenght
+df$lenght <- df$end_position - df$start_position
+# Ordenar la columna con los tamanos orden descendente + a -
+df <- df[order(-df$lenght),]
+# Obtener los ids de los genes mas largos
+head(df,2)
+two_longest_genes <- head(df[,"ensembl_gene_id"],2)
+two_longest_genes
+```
+
+```{r}
+# Buscar los nombres de las columnas y filtros que voy a necesitar en los datos
+available.Filters = listFilters(ensembl_genes)
+searchFilters(mart = ensembl_genes, pattern = "chromosome")
+searchAttributes(mart = ensembl_genes, pattern = "exon")
+searchAttributes(mart = ensembl_genes, pattern = "transcript")
+
+# Escoger las columnas
+mycols = c("ensembl_gene_id", "external_gene_name", "chromosome_name", "start_position", "end_position",  "strand", "gene_biotype","ensembl_exon_id" ,"exon_chrom_start", "exon_chrom_end", "ensembl_transcript_id")
+
+# Hacer una tabla con mis datos
+df = getBM(attributes = mycols,
+      filters = c("chromosome_name", "ensembl_gene_id"),
+      values = list(chr = mychr, id = c("ENSG00000159216","ENSG00000171587")),
+      mart = ensembl_genes)
+
+# Contar el numero de exones
+length(table(df$ensembl_exon_id))
+```
+
+*Exercise 2.2:* Provide the total number of transcripts, take care of not counting more than once each value.
+
+```{r}
+# Contar el numero de transcripts
+length(table(df$ensembl_transcript_id))
+```
+
+*Exercise 3.1:* Retrieve all entrezgene IDs and HUGO gene symbols associated with the GO term related to “defense response to virus” that are within the chromosome that was assigned to you. The corresponding GO term is [<GO:0051607>]. How many unique HUGO gene symbols were obtained?
+
+```{r}
+go_term = "GO:0051607"
+mycols = c('entrezgene_id','hgnc_symbol')
+
+df = getBM(attributes = mycols ,
+      filters= c("chromosome_name","go"),
+      values=list(mychr, go_term),
+      mart=ensembl_genes)
+# Contar el numero de HUGO gene symbols
+length(table(df$hgnc_symbol))
+```
+
+*Exercise 3.2:* How many unique EntrezGene IDs were obtained?
+
+```{r}
+# Contar el numero de EntrezGene IDs
+length(table(df$entrezgene_id))
+```
+
+*Exercise 4:* Use the “ENSEMBL_MART_SNP” of ENSEMBL and “hsapiens_snp” datasets. Retrieve all the genetic variants (SNPs), using the “refsnp_id” attribute, that are located within 1000 bases upstream and 500 downstream of the TSS of the longest gene of your assigned chromosome. Provide the number of unique snps that you get in your query. Note: Remember that the “chr_name”, “start” and “end” can be used as positional filters in BioMart.
+
+```{r}
+# Buscar que columnas necesito en mis datos de genes
+att <- listAttributes(ensembl_genes)
+grep("transcript", att$name, value=TRUE)
+
+# Hacer una lista de las columnas que necesito
+mycols = c("ensembl_gene_id", "external_gene_name", "chromosome_name", "start_position", "end_position", "gene_biotype","transcription_start_site")
+
+# Hacer una table con mis datos de genes
+df <- getBM(attributes = mycols,
+      filters="chromosome_name",
+      values=mychr,
+      mart=ensembl_genes)
+
+# Obtener los tamanos de los genes
+df$lenght <- df$end_position - df$start_position
+
+# Ordenar en orden descendente + a -
+df <- df[order(-df$lenght),]
+
+# Obtener los ids de los genes mas largos
+longest_gene = head(df,1)
+longest_gene
+
+# Obtener la posicion 1000 upstream y 500 downstream del TSS
+# TSS significa transcription start site
+up = longest_gene$transcription_start_site - 1000
+down = longest_gene$transcription_start_site + 500
+```
+
+```{r}
+# Usar snps (no genes) del dataset de hsapiens_snp
+ensembl_snps = useEnsembl(biomart = "snp", dataset="hsapiens_snp")
+
+# Buscar la columna a incluir
+searchAttributes(mart=ensembl_snps, pattern = "gene")
+
+# Hacer la anotacion
+df = getBM(attributes = c('refsnp_id', 'ensembl_gene_name'), 
+      filters = c('chr_name','start','end'),
+      values = list(21, 34887690, 34889190), 
+      mart = ensembl_snps)
+
+# Contar el numero de snps unicos
+length(table(df$refsnp_id))
+```

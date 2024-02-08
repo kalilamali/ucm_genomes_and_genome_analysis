@@ -1,0 +1,292 @@
+---
+title: "R Notebook"
+output: github_document
+---
+
+*1. Importing gene expression quantifications from ENCODE*
+Load gene expression data from ENCODE and integrate with GENCODE data, select the data corresponding to a female donnor of 51 years old from tibial nerve.
+```{r}
+# Load ENCODE data
+nerve.gene <- read.delim("https://www.encodeproject.org/files/ENCFF398VOV/@@download/ENCFF398VOV.tsv")
+
+# Get 2 cols from data and the genes that start with ENSG
+nerve.gene <- nerve.gene[grep(pattern = "ENSG",x = nerve.gene$gene_id),c("gene_id","expected_count")]
+
+# You have the gene and the count of reads (expression)
+colnames(nerve.gene) <- c("gene_id","count")
+#nerve.gene <- subset(nerve.gene, count > 0)
+```
+
+Explore gene expression distribution in tibial nerve.
+```{r}
+# Explore the distribution for the gene expression values
+plot(density(log2(nerve.gene$count)),
+     main="Gene-count distribution (RNA-seq)",
+     col="blue",
+     lwd=2,
+     xlab=" Read counts (log2)")
+```
+*2. Importing H3K4me3 ChIP-seq data (peak file) from ENCODE*
+Explore the data from a ChIP-seq experiment for H3K4me3, select the data corresponding to a female donnor of 51 years old from tibial nerve.
+```{r}
+#BiocManager::install("rtracklayer")
+library(rtracklayer)
+
+# GRanges format
+nerve.peaks <- import("https://www.encodeproject.org/files/ENCFF295YLK/@@download/ENCFF295YLK.bed.gz", format="narrowPeak")
+
+#Check the structure of the data form ENCODE for H3K4me3
+head(nerve.peaks)
+
+#  You will find a Genomic Range object with this information
+# "BED6+4 Peaks of signal enrichment based on pooled, normalized (interpreted) data."
+# 1 string chrom;        "Reference sequence chromosome or scaffold"
+# 2 uint   chromStart;   "Start position in chromosome"
+# 3 uint   chromEnd;     "End position in chromosome"
+# 4 string name;     "Name given to a region (preferably unique). Use . if no name is assigned"
+# 5 uint   score;        "Indicates how dark the peak will be displayed in the browser (0-1000) "
+# 6 char[1]  strand;     "+ or - or . for unknown"
+# 7 float  signalValue;  "Measurement of average enrichment for the region"
+# 8 float  pValue;       "Statistical significance of signal value (-log10). Set to -1 if not used."
+# 9 float  qValue;       "Statistical significance with multiple-test correction applied (FDR -log10). Set to -1 if not used."
+# 20 int   peak;         "Point-source called for this peak; 0-based offset from chromStart. Set to -1 if no point-source called."
+# )
+```
+
+Check peak signal distribution
+```{r}
+# Explore the distribution for the gene expression values
+plot(density(nerve.peaks$signalValue),
+     main="H3K4me3 signal distribution (ChIP-seq)",
+     col="blue",
+     lwd=2,
+     xlab="Peak signal")
+```
+*3. Load GENCODE for GRCh38 as gene annotation file*
+```{r}
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1",
+                      header=TRUE,
+                      stringsAsFactors = FALSE)
+
+# Annotate nerve.gene with gencode data
+nerve.gene.pos <- merge(gencode, nerve.gene, by="gene_id", all.x=TRUE)
+nrow(gencode)
+```
+
+*4. Exploring H3K4me3 signal distribution within the genome*
+Plot the H3K4me3 signal and gene expression using a scatter plot for Chromosome 10.
+```{r}
+# We combine gene expression data and gencode to get gene genomic coordinates.
+nerve.gene.pos <- subset(nerve.gene.pos, !is.na(start))
+
+# We select a chromosome for the plot
+nerve.peaks.1 <- subset(nerve.peaks, seqnames=="chr1")
+nerve.gene.pos.1 <- subset(nerve.gene.pos, chromosome=="chr1")
+```
+
+Scatter plot for Chromosome 1
+```{r}
+plot(nerve.peaks.1@ranges@start/1E6,
+     nerve.peaks.1$signalValue,
+     col="blue",
+     cex=0.1,
+     #xlim=c(10,30),
+     ylim=c(0,50),
+     xlab="Genome positoin (Mb)",
+     ylab="H3K4me3")
+
+# We manually adjust the genes in an upper position compared to H3K4me3 
+segments(x0 = nerve.gene.pos.1$start/1E6,
+         y0 = log2(nerve.gene.pos.1$count)+30,
+         x1 = nerve.gene.pos.1$end/1E6,
+         y1 = log2(nerve.gene.pos.1$count)+30,
+         col = "red",
+         lwd=1.5)
+abline(h=mean(log2(nerve.gene.pos.1$count)+30), lwd=0.7)
+```
+
+*5. Analysing H3K4me3 signal at gene TSS*
+Explore H3K4me3 signal at gene promoters (TSS, 3Kb upstream and 2Kb downstream).
+```{r}
+library(GenomicRanges)
+
+# Annotation data from gencode to GRanges format
+# Load genomic coordinates of genes as genomic range object
+gr.gene <- GRanges(seqnames = nerve.gene.pos$chromosome,
+                          ranges = IRanges(start = nerve.gene.pos$start, end = nerve.gene.pos$end),
+                          strand = nerve.gene.pos$strand,
+                          geneID = nerve.gene.pos$gene_name,
+                          type=nerve.gene.pos$type,
+                          count=nerve.gene.pos$count)
+# Get promoters
+gr.tss <- promoters(x = gr.gene, upstream = 3000, downstream = 2000)
+
+# H3K4me3 peaks were imported directly into a genomic range object
+
+# Find the overlap between the promoter and the peak
+peak.tissue.overlap <- findOverlaps(query = gr.tss, subject = nerve.peaks)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.tissue.overlap)
+subjectHits(peak.tissue.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(peak.tissue.overlap)])
+peak.overlaps <- as.data.frame(nerve.peaks[subjectHits(peak.tissue.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(peak.overlaps) <- paste0("S_",colnames(peak.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.peak.nerve.overlap.full <- cbind(genes.overlaps, peak.overlaps) 
+```
+
+*6. Relationship between gene expression and histone marks*
+```{r}
+summary(nerve.gene$count)
+
+# High > 599
+# Medium 0-599
+# Low 0
+# No TSS not in dataset
+boxplot(subset(gene.peak.nerve.overlap.full, Q_count > 559)$S_signalValue,
+        subset(gene.peak.nerve.overlap.full, Q_count > 0 & Q_count < 559)$S_signalValue,
+        subset(gene.peak.nerve.overlap.full, Q_count == 0)$S_signalValue,
+        subset(nerve.peaks, !peak%in%gene.peak.nerve.overlap.full$S_peak)$signalValue, 
+        names=c("high","medium","low","No_TSS"), col="grey")
+```
+
+*7. Repeat the analysis using a repressive mark H3K27me3*
+7_2. Importing H3K4me3 ChIP-seq data (peak file) from ENCODE
+Explore the data from a ChIP-seq experiment for H3K4me3, select the data corresponding to a female donnor of 51 years old from tibial nerve.
+```{r}
+nerve.peaks <- import("https://www.encodeproject.org/files/ENCFF413ODR/@@download/ENCFF413ODR.bed.gz", format="narrowPeak")
+
+#Check the structure of the data form ENCODE for H3K27me3
+head(nerve.peaks)
+```
+7_Check peak signal distribution
+```{r}
+# Explore the distribution for the gene expression values
+plot(density(nerve.peaks$signalValue),
+     main="H3K27me3 signal distribution (ChIP-seq)",
+     col="blue",
+     lwd=2,
+     xlab="Peak signal")
+```
+7_3. Load GENCODE for GRCh38 as gene annotation file
+```{r}
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1",
+                      header=TRUE,
+                      stringsAsFactors = FALSE)
+
+# Annotate nerve.gene with gencode data
+nerve.gene.pos <- merge(gencode, nerve.gene, by="gene_id", all.x=TRUE)
+nrow(gencode)
+```
+7_4. Exploring H3K27me3 signal distribution within the genome
+Plot the H3K27me3 signal and gene expression using a scatter plot for Chromosome 10.
+```{r}
+# We combine gene expression data and gencode to get gene genomic coordinates.
+nerve.gene.pos <- subset(nerve.gene.pos, !is.na(start))
+
+# We select a chromosome for the plot
+nerve.peaks.1 <- subset(nerve.peaks, seqnames=="chr1")
+nerve.gene.pos.1 <- subset(nerve.gene.pos, chromosome=="chr1")
+```
+
+7_Scatter plot for Chromosome 1
+```{r}
+plot(nerve.peaks.1@ranges@start/1E6,
+     nerve.peaks.1$signalValue,
+     col="blue",
+     cex=0.1,
+     #xlim=c(10,30),
+     ylim=c(0,50),
+     xlab="Genome positoin (Mb)",
+     ylab="H3K27me3")
+
+# We manually adjust the genes in an upper position compared to H3K4me3 
+segments(x0 = nerve.gene.pos.1$start/1E6,
+         y0 = log2(nerve.gene.pos.1$count)+30,
+         x1 = nerve.gene.pos.1$end/1E6,
+         y1 = log2(nerve.gene.pos.1$count)+30,
+         col = "red",
+         lwd=1.5)
+abline(h=mean(log2(nerve.gene.pos.1$count)+30), lwd=0.7)
+```
+
+7_5. Analysing H3K27me3 signal at gene TSS
+Explore H3K27me3 signal at gene promoters (TSS, 3Kb upstream and 2Kb downstream).
+```{r}
+library(GenomicRanges)
+
+# Annotation data from gencode to GRanges format
+# Load genomic coordinates of genes as genomic range object
+gr.gene <- GRanges(seqnames = nerve.gene.pos$chromosome,
+                          ranges = IRanges(start = nerve.gene.pos$start, end = nerve.gene.pos$end),
+                          strand = nerve.gene.pos$strand,
+                          geneID = nerve.gene.pos$gene_name,
+                          type=nerve.gene.pos$type,
+                          count=nerve.gene.pos$count)
+# Get promoters
+gr.tss <- promoters(x = gr.gene, upstream = 3000, downstream = 2000)
+
+# H3K4me3 peaks were imported directly into a genomic range object
+
+# Find the overlap between the promoter and the peak
+peak.tissue.overlap <- findOverlaps(query = gr.tss, subject = nerve.peaks)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.tissue.overlap)
+subjectHits(peak.tissue.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(peak.tissue.overlap)])
+peak.overlaps <- as.data.frame(nerve.peaks[subjectHits(peak.tissue.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(peak.overlaps) <- paste0("S_",colnames(peak.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.peak.nerve.overlap.full <- cbind(genes.overlaps, peak.overlaps) 
+```
+
+7_6. Relationship between gene expression and histone marks
+```{r}
+summary(nerve.gene$count)
+
+# High > 599
+# Medium 0-599
+# Low 0
+# No TSS not in dataset
+boxplot(subset(gene.peak.nerve.overlap.full, Q_count > 559)$S_signalValue,
+        subset(gene.peak.nerve.overlap.full, Q_count > 0 & Q_count < 559)$S_signalValue,
+        subset(gene.peak.nerve.overlap.full, Q_count == 0)$S_signalValue,
+        subset(nerve.peaks, !peak%in%gene.peak.nerve.overlap.full$S_peak)$signalValue, 
+        names=c("high","medium","low","No_TSS"), col="grey")
+```
+
+*8. Get Transcription Factor (TF) Binding Sites from ChIP-seq experiments*
+Complete the next steps to load the peakset for any Transcription Factor (TF) from ReMap Database. These steps will be helpful to complete the homeworks, a TF has been assigned to you check it here.
+
+- First, go to ReMap 2022 > Downloads > Search for the required TF.
+- Search your TF and copy the link for merged peaks and Human Genome Assembly hg38.
+- Go to the UNIX terminal that is available in RStudio cloud and use the following UNIX commands. Note: do not run them into the R console, do it in RStudio cloud terminal window or do a normal download and upload the file into RStudio cloud.
+```{r}
+# This command download the file merged peak file of your TF
+#wget https://remap.univ-amu.fr/storage/remap2022/hg38/MACS2/TF/SP1/remap2022_SP1_nr_macs2_hg38_v1_0.bed.gz
+
+# This command decompress the ".bed.gz" file 
+#gzip -d remap2022_SP1_nr_macs2_hg38_v1_0.bed.gz
+```
+
+Back to RStudio cloud console and read the bed file for SP1 using the following R commands:
+```{r}
+sp1.peaks <- read.table(file = "remap2022_SP1_nr_macs2_hg38_v1_0.bed", sep="\t")
+sp1.peaks <- sp1.peaks[,c("V1","V2","V3","V5")]
+sp1.peaks$peakID <- paste0("peakID_", 1:nrow(sp1.peaks))
+colnames(sp1.peaks) <- c("chromosome","start","end","signal","peakID")
+sp1.peaks$strand <- rep(x = "*", times=nrow(sp1.peaks))
+```
+

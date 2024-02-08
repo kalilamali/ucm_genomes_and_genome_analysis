@@ -1,0 +1,323 @@
+---
+title: "R Notebook"
+output: github_document
+---
+
+*Exercise 1:* How many UNIQUE gene promoters (3Kb upstream and 2Kb downstream) overlap with H3K27me3 peaks in your chromosome? Se piden los solapamientos con todos los genes tal y como se procesa en el tutorial, y la solución se refiere solo a aquellos solapamientos que se correspondan con tu cromosoma asignado
+
+```{r}
+### 1. Importing gene expression quantifications from ENCODE
+
+# Load gene expression data from ENCODE
+nerve.gene <- read.delim("https://www.encodeproject.org/files/ENCFF398VOV/@@download/ENCFF398VOV.tsv")
+nerve.gene <- nerve.gene[grep(pattern = "ENSG",x = nerve.gene$gene_id),c("gene_id","expected_count")]
+colnames(nerve.gene) <- c("gene_id","count")
+#nerve.gene <- subset(nerve.gene, count > 0)
+```
+
+```{r}
+### 2. Importing H3K27me3 ChIP-seq data (peak file) from ENCODE
+# BiocManager::install("rtracklayer")
+library(rtracklayer)
+# Explore the data from a ChIP-seq experiment for H3K27me3
+nerve.peaks <- import("https://www.encodeproject.org/files/ENCFF413ODR/@@download/ENCFF413ODR.bed.gz", format="narrowPeak")
+
+#head(nerve.peaks)
+```
+
+```{r}
+### 3. Load GENCODE for GRCh38 as gene annotation file
+
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1",
+                      header=TRUE,
+                      stringsAsFactors = FALSE)
+
+nerve.gene.pos <- merge(gencode, nerve.gene, by="gene_id", all.x=TRUE)
+#nrow(gencode)
+```
+
+```{r}
+### 4. Exploring H3K27me3 signal distribution within the genome
+
+# We combine gene expression data and gencode to get gene genomic coordinates.
+nerve.gene.pos <- subset(nerve.gene.pos, !is.na(start))
+
+# We select a chromosome for the plot
+nerve.peaks.1 <- subset(nerve.peaks, seqnames=="chr21")
+nerve.gene.pos.1 <- subset(nerve.gene.pos, chromosome=="chr21")
+
+#head(nerve.peaks.1)
+#head(nerve.gene.p.1)
+```
+
+```{r}
+### 5. Analysing H3K27me3 signal at gene TSS
+library(GenomicRanges)
+
+# Load genomic coordinates of genes as genomic range object
+gr.gene <- GRanges(seqnames = nerve.gene.pos.1$chromosome,
+                          ranges = IRanges(start = nerve.gene.pos.1$start, end = nerve.gene.pos.1$end),
+                          strand = nerve.gene.pos.1$strand,
+                          geneID = nerve.gene.pos.1$gene_name,
+                          type=nerve.gene.pos.1$type,
+                          count=nerve.gene.pos.1$count)
+#
+gr.tss <- promoters(x = gr.gene, upstream = 3000, downstream = 2000)
+
+# H3K4me3 peaks were imported directly into a genomic range object
+
+peak.tissue.overlap <- findOverlaps(query = gr.tss, subject = nerve.peaks.1)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.tissue.overlap)
+subjectHits(peak.tissue.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(peak.tissue.overlap)])
+peak.overlaps <- as.data.frame(nerve.peaks.1[subjectHits(peak.tissue.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(peak.overlaps) <- paste0("S_",colnames(peak.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.peak.nerve.overlap.full <- cbind(genes.overlaps, peak.overlaps) 
+```
+
+```{r}
+# Count how manu unique geneID are in the query:gr.tss
+length(table(gene.peak.nerve.overlap.full$Q_geneID))
+```
+# ASNWER: 37
+
+*Exercise 2:* How many overlaps has been generarted between H3K4me3 peaks and H3K27me3 peaks in your chromosome? Se piden los solapamientos entre las modificaciones de histonas, y la solución se refiere solo a aquellos solapamientos que se correspondan con tu cromosoma asignado.
+
+```{r}
+### 2. Importing H3K27me3 and H3K4me3 ChIP-seq data (peak file) from ENCODE
+
+# Explore the data from a ChIP-seq experiment for H3K27me3
+nerve.peaks.a <- import("https://www.encodeproject.org/files/ENCFF413ODR/@@download/ENCFF413ODR.bed.gz", format="narrowPeak")
+
+# Explore the data from a ChIP-seq experiment for H3K4me3
+nerve.peaks.b <- import("https://www.encodeproject.org/files/ENCFF295YLK/@@download/ENCFF295YLK.bed.gz", format="narrowPeak")
+
+#head(nerve.peaks.a)
+#head(nerve.peaks.b)
+```
+
+```{r}
+### 4. Exploring H3K4me3 signal distribution within the genome
+
+# We select a chromosome for the plot
+nerve.peaks.a.1 <- subset(nerve.peaks.a, seqnames=="chr21")
+nerve.peaks.b.1 <- subset(nerve.peaks.b, seqnames=="chr21")
+```
+
+```{r}
+### 5. Analysing H3K4me3 signal at gene TSS
+
+library(GenomicRanges)
+
+peak.histone.overlap <- findOverlaps(query = nerve.peaks.b.1, subject = nerve.peaks.a.1)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.histone.overlap)
+subjectHits(peak.histone.overlap)
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+peak.b.overlaps <- as.data.frame(nerve.peaks.b.1[queryHits(peak.histone.overlap)])
+peak.a.overlaps <- as.data.frame(nerve.peaks.a.1[subjectHits(peak.histone.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(peak.b.overlaps) <- paste0("Q_",colnames(peak.b.overlaps))
+colnames(peak.a.overlaps) <- paste0("S_",colnames(peak.a.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+peak.b.a.overlap.full <- cbind(peak.b.overlaps, peak.a.overlaps) 
+```
+
+```{r}
+dim(peak.b.a.overlap.full)
+```
+
+# ANSWER 10
+
+*Exercise 3.1:* Download a bed file for the transcription factor that has been assigned to you for hg38 in ReMap 2022 (merged or non-redundant peaks). How many unique peaks are overlapping at least one expressed genes in tibial nerve? En este caso, se requiere especificar el número de sitios de unión de vuestro factor de transcripción (TFBS) que se obtiene a partir de los solapamientos que se produce entre los TFBS y la region del gen de entre TODOS los cromosomas. También ten cuenta que se pide para genes expresados, por lo que se espera que al menos haya como mínimo 1 lectura de cada gen expresado en el nervio de la tibia pues si no se hace ese filtro no habría diferencia de hacerlo con Gencode completo.
+
+```{r}
+### 8. Get Transcription Factor (TF) Binding Sites from ChIP-seq experiments
+
+#Chromosome: chr21
+#Transcription Factor: BRD4
+# My command with my TF
+#wget https://remap.univ-amu.fr/storage/remap2022/hg38/MACS2/TF/BRD4/remap2022_BRD4_nr_macs2_hg38_v1_0.bed.gz
+#gzip -d remap2022_BRD4_nr_macs2_hg38_v1_0.bed.gz
+
+brd4.peaks <- read.table(file = "remap2022_BRD4_nr_macs2_hg38_v1_0.bed", sep="\t")
+brd4.peaks <- brd4.peaks[,c("V1","V2","V3","V5")]
+brd4.peaks$peakID <- paste0("peakID_", 1:nrow(brd4.peaks))
+colnames(brd4.peaks) <- c("chromosome","start","end","signal","peakID")
+brd4.peaks$strand <- rep(x = "*", times=nrow(brd4.peaks))
+```
+
+```{r}
+### 1. Importing gene expression quantifications from ENCODE
+nerve.gene <- read.delim("https://www.encodeproject.org/files/ENCFF398VOV/@@download/ENCFF398VOV.tsv")
+
+nerve.gene <- nerve.gene[grep(pattern = "ENSG",x = nerve.gene$gene_id),c("gene_id","expected_count")]
+colnames(nerve.gene) <- c("gene_id","count")
+# Para genes expresados
+nerve.gene <- subset(nerve.gene, count > 0)
+```
+
+```{r}
+### 2. Importing H3K4me3 ChIP-seq data (peak file) from ENCODE
+# This are equivalent, don't run
+#nerve.peaks = brd4.peaks
+```
+
+```{r}
+### 3. Load GENCODE for GRCh38 as gene annotation file
+gencode <- read.table("https://www.dropbox.com/s/le9vs2n51lsxlw1/gencode_GRCh38.txt?dl=1",
+                      header=TRUE,
+                      stringsAsFactors = FALSE)
+
+nerve.gene.pos <- merge(gencode, nerve.gene, by="gene_id", all.x=TRUE)
+#nrow(gencode)
+```
+
+```{r}
+### 4. Exploring H3K4me3 signal distribution within the genome
+
+# We combine gene expression data and gencode to get gene genomic coordinates.
+nerve.gene.pos <- subset(nerve.gene.pos, !is.na(start))
+```
+
+```{r}
+### 5. Analysing H3K4me3 signal at gene TSS
+
+library(GenomicRanges)
+
+# Load genomic coordinates of genes as genomic range object
+gr.gene <- GRanges(seqnames = nerve.gene.pos$chromosome,
+                          ranges = IRanges(start = nerve.gene.pos$start, end = nerve.gene.pos$end),
+                          strand = nerve.gene.pos$strand,
+                          geneID = nerve.gene.pos$gene_name,
+                          type=nerve.gene.pos$type,
+                          count=nerve.gene.pos$count)
+
+nerve.peaks <- GRanges(seqnames = brd4.peaks$chromosome,
+                          ranges = IRanges(start = brd4.peaks$start, end = brd4.peaks$end),
+                          strand = brd4.peaks$strand,
+                          peakID = brd4.peaks$peakID,
+                          signalValue=brd4.peaks$signal)
+#
+gr.tss <- promoters(x = gr.gene, upstream = 3000, downstream = 2000)
+
+# H3K4me3 peaks were imported directly into a genomic range object
+
+peak.tissue.overlap <- findOverlaps(query = gr.tss, subject = nerve.peaks)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.tissue.overlap)
+subjectHits(peak.tissue.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr.tss[queryHits(peak.tissue.overlap)])
+peak.overlaps <- as.data.frame(nerve.peaks[subjectHits(peak.tissue.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(peak.overlaps) <- paste0("S_",colnames(peak.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.peak.nerve.overlap.full <- cbind(genes.overlaps, peak.overlaps) 
+```
+
+```{r}
+length(table(gene.peak.nerve.overlap.full$S_peakID))
+```
+# ANSWER: 143833
+
+*Exercise 3.2:* How many expressed genes of tibial nerve are overlapping with at least a Transcription Factor Bioding Site (TFBS), also know as peak, of your assigned TF? (across all chromosomes) En este caso, se requiere especificar el número de genes expresados que se obtiene a partir de los solapamientos que se produce entre los TFBS y la region del gen de entre TODOS los cromosomas. También ten cuenta que se pide para genes expresados, por lo que se espera que al menos haya como mínimo 1 lectura de cada gen expresado en el nervio de la tibia pues si no se hace ese filtro no habría diferencia de hacerlo con Gencode completo.
+
+```{r}
+length(table(gene.peak.nerve.overlap.full$Q_geneID))
+```
+
+*Exercise 4:* How many “Pathogenic” Single Nucleotide Variants from ClinVar are overlapping Binding Sites of your assigned TF? Take care on selecting just “Pathogenic” and not any other pattern such as “likely pathonenic”. Use GRCh38 for gencode and the genetic variant file from ClinVar that is accessible by this Dropbox link.
+
+```{r}
+# Load assigned TF
+brd4.peaks <- read.table(file = "remap2022_BRD4_nr_macs2_hg38_v1_0.bed", sep="\t")
+brd4.peaks <- brd4.peaks[,c("V1","V2","V3","V5")]
+brd4.peaks$peakID <- paste0("peakID_", 1:nrow(brd4.peaks))
+colnames(brd4.peaks) <- c("chromosome","start","end","signal","peakID")
+brd4.peaks$strand <- rep(x = "*", times=nrow(brd4.peaks))
+
+# Conver to GRanges format
+nerve.peaks <- GRanges(seqnames = brd4.peaks$chromosome,
+                          ranges = IRanges(start = brd4.peaks$start, end = brd4.peaks$end),
+                          strand = brd4.peaks$strand,
+                          peakID = brd4.peaks$peakID,
+                          signalValue=brd4.peaks$signal)
+# Load variant data
+full.clinvar <- read.delim(file = "variant_summary.txt", stringsAsFactors = FALSE)
+clinvar <- subset(full.clinvar, Assembly=="GRCh38")
+
+rm(full.clinvar)
+
+clinvar[1:5,]
+
+clinvar$Chromosome <- paste("chr", clinvar$Chromosome, sep="")
+
+
+clinvar.pathogenic <- subset(clinvar, ClinicalSignificance=="Pathogenic")
+clinvar.pathogenic <- clinvar.pathogenic[,c("RS...dbSNP.","Chromosome","Start","Stop","Cytogenetic","Type")]
+clinvar.pathogenic <- subset(clinvar.pathogenic, RS...dbSNP.!="-1")
+
+rm(clinvar)
+
+table(clinvar.pathogenic$Type)
+
+# We select only Pathogenic genomic variation
+clinvar.pathogenic <- subset(clinvar.pathogenic, Type=="single nucleotide variant")
+
+# We remove redundants rows.
+clinvar.pathogenic <- unique(clinvar.pathogenic)
+genetic.variants <- clinvar.pathogenic
+colnames(genetic.variants) <- c("VarID","chromosome","start", "end", "cytogenetic", "Type")
+
+# We remove processed data.frames
+rm(clinvar.pathogenic)
+```
+
+```{r}
+# Load genetic variants coordinates as genomic range object
+gvar <- GRanges(seqnames = genetic.variants$chromosome,
+                ranges = IRanges(start = genetic.variants$start, end = genetic.variants$end),
+                strand = rep(x = "*", times=length(genetic.variants$VarID)),
+                VarID = genetic.variants$VarID)
+```
+
+```{r}
+library(GenomicRanges)
+
+peak.tissue.overlap <- findOverlaps(query = gvar, subject = nerve.peaks)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(peak.tissue.overlap)
+subjectHits(peak.tissue.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gvar[queryHits(peak.tissue.overlap)])
+peak.overlaps <- as.data.frame(nerve.peaks[subjectHits(peak.tissue.overlap)])
+
+## Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(peak.overlaps) <- paste0("S_",colnames(peak.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.peak.nerve.overlap.full <- cbind(genes.overlaps, peak.overlaps) 
+```
+
+```{r}
+length(table(gene.peak.nerve.overlap.full$Q_VarID))
+```
+
+#ASNWER: 11139

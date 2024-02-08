@@ -1,0 +1,9 @@
+# Primero descargar programa
+# Instalar java
+# Correr programa para ver databases
+# Escoger Klebsiella_pneumoniae_subsp_pneumoniae_hs11286
+# Poner la opcion -v para ver cual es el nombre del chromosoma
+# Chromosome
+# Commando para snpEff
+
+java -Xmx4g -jar snpEff.jar -v Klebsiella_pneumoniae_subsp_pneumoniae_hs11286 test_variants_of_interest.vcf > test_variants_of_interest.ann.vcf

@@ -1,0 +1,124 @@
+---
+title: "K.pneumoniae genome analysis"
+output: html_notebook
+---
+```{r}
+# We load the specific library installed from BioConductor
+library(GenomicRanges)
+```
+
+*Annotation data*
+```{r}
+# Load genome annotation data downloaded from NCBI
+gencode <- read.csv("gene_annotation_Kpneumoniae.csv")
+head(gencode)
+```
+```{r}
+# Load genomic coordinates of genes as genomic range object
+gr <- GRanges(seqnames = gencode$Accession,
+              ranges = IRanges(start = gencode$Start, end = gencode$Stop),
+              strand = gencode$Strand,
+              proteinID = gencode$Protein.product,
+              proteinname = gencode$Protein.Name)
+head(gr)
+```
+*Variants data*
+```{r}
+# Load variant data done by ourselfs
+variants <- read.csv('variants.txt', sep='\t')
+
+variants$Start <- variants$POS
+variants$Change <- paste(variants$REF, variants$ALT)
+
+
+# Load genomic coordinates of genes as genomic range object
+gvar <- GRanges(seqnames = variants$X.CHROM,
+              ranges = IRanges(start = variants$Start, end = variants$Start),
+              strand = rep(x = "*", times=length(variants$POS)),
+              VarID = variants$POS,
+              change = variants$Change)
+head(gvar)
+```
+*Put together annotation and variants data*
+```{r}
+# Find overlaps
+gene.var.overlap <- findOverlaps(query = gr, subject = gvar)
+# Get the index of elements in the query that overlaps with an element in the subject
+queryHits(gene.var.overlap)
+subjectHits(gene.var.overlap)
+
+# We make two diferent data frames with the same number of rows that will be combined into 1 data frame.
+genes.overlaps <- as.data.frame(gr[queryHits(gene.var.overlap)])
+gvars.overlaps <- as.data.frame(gvar[subjectHits(gene.var.overlap)])
+
+# Change the names of the columns add a prefix Q (for query) and S (for subjet).
+colnames(genes.overlaps) <- paste0("Q_",colnames(genes.overlaps))
+colnames(gvars.overlaps) <- paste0("S_",colnames(gvars.overlaps))
+
+# Combine the table of overlapping genes with the table of their overlapping genetic variants
+gene.var.overlap.full <- cbind(genes.overlaps, gvars.overlaps) 
+```
+*General analysis*
+```{r}
+# General analysis
+#ramA	putative regulatory protein	YP_005225689.1
+#rarA	recombination factor protein RarA	YP_005226103.1
+#acrB	acridine efflux pump	YP_005225488.1
+#rpsJ	30S ribosomal protein S10	YP_005229170.1
+
+# How many variants are in this 4 proteins?
+p <- c('YP_005225689.1', 'YP_005226103.1','YP_005225488.1','YP_005229170.1')
+df <- gene.var.overlap.full[gene.var.overlap.full$Q_proteinID %in% p,]
+dim(df)
+```
+```{r}
+# What is the most common mutation?
+sort(table(df$S_change), decreasing = T)
+```
+
+```{r}
+#ramA	putative regulatory protein	YP_005225689.1
+#rarA	recombination factor protein RarA	YP_005226103.1
+#acrB	acridine efflux pump	YP_005225488.1
+#rpsJ	30S ribosomal protein S10	YP_005229170.1
+
+# Which protein has more mutations?
+sort(table(df$Q_proteinname), decreasing = T)
+```
+```{r}
+#ramA	putative regulatory protein	YP_005225689.1
+#rarA	recombination factor protein RarA	YP_005226103.1
+#acrB	acridine efflux pump	YP_005225488.1
+#rpsJ	30S ribosomal protein S10	YP_005229170.1
+
+# Which protein has more mutations?
+sort(table(df$Q_proteinID), decreasing = T)
+```
+```{r}
+# What is the most common mutation in:
+#acrB	acridine efflux pump	YP_005225488.1 ?
+sort(table(subset(df,df$Q_proteinID=="YP_005225488.1")$S_change), decreasing = T)
+```
+
+```{r}
+# What is the most common mutation in:
+#rarA	recombination factor protein RarA	YP_005226103.1 ?
+sort(table(subset(df,df$Q_proteinID=="YP_005226103.1")$S_change), decreasing = T)
+```
+
+```{r}
+# What is the most common mutation in:
+#acrB	acridine efflux pump	YP_005225488.1 ?
+sort(table(subset(df,df$Q_proteinID=="YP_005225488.1")$S_change), decreasing = T)
+```
+```{r}
+# What is the most common mutation in:
+#rpsJ	30S ribosomal protein S10	YP_005229170.1?
+#sort(table(subset(df,df$Q_proteinID=="YP_005229170.1")$S_change), decreasing = T)
+```
+
+```{r}
+voi <- variants[variants$POS%in%df$S_VarID,]
+write.table(voi, file='variants_of_interest.vcf', quote=FALSE, sep='\t', col.names = NA)
+```
+

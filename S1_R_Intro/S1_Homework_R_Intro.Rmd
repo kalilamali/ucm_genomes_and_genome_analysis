@@ -1,0 +1,140 @@
+---
+title: "Material semana 11 Octubre 2021"
+output: github_document
+---
+
+*Exercise 1:* Explore the dimensions of the gencode data frame. How many rows and columns has gencode?
+
+```{r}
+# Read data
+gencode <- read.table(file ="gencode_GRCh38.txt", header=TRUE, stringsAsFactors = FALSE)
+# Show first rows of data
+print(head(gencode))
+```
+
+```{r}
+# Option 1
+dim(gencode)
+```
+
+```{r}
+# Option 2
+print(nrow(gencode))
+print(ncol(gencode))
+```
+
+*Exercise 2:* Get the values from the last 2 rows of the last 2 columns in gencode data.frame.
+
+```{r}
+# Option 1
+gencode[58720:58721,6:7]
+```
+
+```{r}
+# Option 2
+tail(gencode,2)
+```
+
+*Exercise 3:* Calculate the number of characters in your first and last name (exactly as your name appears in the CV and including blank spaces), multiply this number by the day and then by the month of your birthday. Use the resulting number as a row number index to select the correspoding gene in gencode data frame.
+
+```{r}
+# Use the nchar function
+n <- nchar('Firstname Lastname')
+myindex = n*1*1
+# data[row, columns]
+gencode[myindex,]
+```
+
+*Exercise 4:* Which chromosome has the smallest number of lincRNA genes?
+
+```{r}
+# Subset
+gencode.l <- subset(gencode, type=='lincRNA')
+# Count
+mycounts <- table(gencode.l$chromosome)
+lowest = min(mycounts)
+mycounts[mycounts==lowest]
+```
+
+*Exercise 5:* How many different gene names have at least a letter âXâ or âxâ in gencode?
+
+```{r}
+# Count
+table(grepl('x', gencode$gene_name))
+```
+
+*Exercise 6:* Plot genome positions and index, as we did in 10.1, but using red colors for âprotein_codingâ genes and select the chromosome that has been assigned to you. (Note: Save the plot as a PDF in 5 x 5 inches).
+
+```{r}
+# Subset data
+gencode.21 <- subset(gencode, chromosome=="chr21")
+# Create a new column
+gencode.21$position <- gencode.21$start + (gencode.21$end - gencode.21$start)
+# Plot
+plot(x = gencode.21$position/1E6,
+     y = length(gencode.21$position):1,
+     col=ifelse(gencode.21$type=="protein_coding","red","grey"),
+     cex=ifelse(gencode.21$type=="protein_coding",0.5,0.1),
+     main="protein coding",
+     xlab="Genome position (Mbases)",
+     ylab="Gene index")
+abline(v=60)
+```
+
+*Exercise 7:* Estimate based on the information of gene annotation in genecode the length of the chromosome that has been assigned to you.
+
+```{r}
+# Get the max ot the column end
+max(gencode.21$end)
+```
+
+*Exercise 8:* What are the longest gene within the chromosome assigned to you?
+
+```{r}
+# Get a rough idea with a histogram
+hist(x = (gencode.21$end - gencode.21$start),
+     xlab="Gene length",
+     main = "Gene length distribution",
+     col="blue",
+     breaks = 20 )
+```
+
+```{r}
+# Create a new column named lenghts
+gencode.21$lenghts <- gencode.21$end - gencode.21$start
+# Find the max in that column
+longest <- max(gencode.21$lenghts)
+gencode.21[which(gencode.21$lenght==longest),]
+```
+
+*Exercise 9:* What is the shortest gene within the chromosome assigned to you?
+
+```{r}
+# Find the min in the column lenghts
+shortest <- min(gencode.21$lenghts)
+gencode.21[which(gencode.21$lenght==shortest),]
+```
+
+*Exercise 10:* Make one density plot for the gene length distribution of protein coding genes and add another density line for the gene length distribution of all non-protein-coding genes. Use in this exercise all chromosomes in order to optimise the visualisation of the differences. (Note: Save the plot as a PDF in 5 x 5 inches).
+
+```{r}
+# Subset data
+gencode.PC <- subset(gencode, type=="protein_coding")
+gencode.NPC <- subset(gencode, type=="non_coding")
+
+# Use density function
+gene.length.density.PC <- density(x = log10(gencode.PC$end - gencode.PC$start) , bw = 0.1)
+gene.length.density.NPC <- density(x = log10(gencode.NPC$end - gencode.NPC$start) , bw = 0.1)
+
+# Plot
+plot(x = gene.length.density.PC,
+     xlab="Gene length",
+     main = "Gene length distributions",
+     col="blue",
+     xlim=c(0,10),
+     ylim=c(0,2))
+
+lines(gene.length.density.NPC,
+      col="red",
+      lwd=3)
+```
