@@ -1,6 +1,6 @@
 ---
 title: "Material semana 1 Noviembre 2021"
-output: github_document
+output: rmarkdown::github_document
 ---
 
 *Tutorial:*

@@ -1,6 +1,6 @@
 ---
 title: "Material Semana Noviembre 19 2021"
-output: github_document
+output: rmarkdown::github_document
 ---
 ```{r}
 # Set working directory
@@ -359,9 +359,9 @@ ego <- enrichGO(gene          = substr(rownames(subset(newdf, padj < 0.05)),1,15
                 readable      = TRUE)
 
 
-pdf(file = "dotplot_Pre_vs_Post_malaria.pdf", width = 30, height = 30)
-dotplot(ego, showCategory=200) + ggtitle("dotplot for Pre_vs_Post")
-dev.off()
+#pdf(file = "dotplot_Pre_vs_Post_malaria.pdf", width = 30, height = 30)
+#dotplot(ego, showCategory=200) + ggtitle("dotplot for Pre_vs_Post")
+#dev.off()
 
 # Get the number of genes from newdf
 # Get the number of genes from universe (the background genes)

@@ -1,6 +1,6 @@
 ---
 title: "Material semana 11 Octubre 2021"
-output: github_document
+output: rmarkdown::github_document
 ---
 
 *Exercise 1:* Explore the dimensions of the gencode data frame. How many rows and columns has gencode?

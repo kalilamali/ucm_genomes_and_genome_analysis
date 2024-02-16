@@ -1,6 +1,6 @@
 ---
 title: "K.pneumoniae genome analysis"
-output: html_notebook
+output: rmarkdown::github_document
 ---
 ```{r}
 # We load the specific library installed from BioConductor

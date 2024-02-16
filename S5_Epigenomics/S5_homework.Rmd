@@ -1,6 +1,6 @@
 ---
 title: "R Notebook"
-output: github_document
+output: rmarkdown::github_document
 ---
 
 *Exercise 1:* How many UNIQUE gene promoters (3Kb upstream and 2Kb downstream) overlap with H3K27me3 peaks in your chromosome? Se piden los solapamientos con todos los genes tal y como se procesa en el tutorial, y la solución se refiere solo a aquellos solapamientos que se correspondan con tu cromosoma asignado

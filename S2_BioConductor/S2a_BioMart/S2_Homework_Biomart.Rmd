@@ -1,6 +1,6 @@
 ---
 title: "Material semana 27 Octubre 2021"
-output: github_document
+output: rmarkdown::github_document
 ---
 
 *Tutorial:* <https://bioconductor.org/packages/release/bioc/vignettes/biomaRt/inst/doc/accessing_ensembl.html>
